@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 ggez = "0.8.1"
-dashmap = "5.4.0"
+dashmap = { version = "5.4.0", features = ["rayon"] }
+rayon = { version = "1.6.1"}

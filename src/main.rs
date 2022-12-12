@@ -1,13 +1,15 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::time::Instant;
 use std::vec;
 
-//use dashmap::HashMap;
-//use dashmap::HashSet;
+//Concurrency
+use dashmap::DashMap;
+use dashmap::DashSet;
+use rayon::prelude::*;
 
+//RNG
 use rand::Rng;
 
+//Graphics, input, and timing
 use ggez::conf;
 use ggez::event;
 use ggez::timer;
@@ -17,7 +19,7 @@ use ggez::event::EventHandler;
 use ggez::{Context, ContextBuilder, GameResult};
 
 const DESIRED_FPS: u32 = 60;
-const TILES_SPANNING: u32 = 100; //The number of tiles spanning the board
+const TILES_SPANNING: u32 = 1000; //The number of tiles spanning the board
 const AUTO_SCALE_TILES: bool = true;
 const TILE_SIZE: u32 = if AUTO_SCALE_TILES {1000 / TILES_SPANNING} else {10} ; //Width of one tile in Pixels
 const SCREEN_SIZE: f32 = (TILES_SPANNING * TILE_SIZE) as f32;
@@ -27,7 +29,8 @@ const PRINT_FPS: bool = true;
 const PRINT_DRAW_TIME: bool = false;
 
 type Cell = (i32, i32);
-type Colony = HashSet<Cell>;
+
+type Colony = DashSet<Cell>;
 
 fn cell_to_rect(cell: &Cell) -> graphics::Rect {
     graphics::Rect::new_i32(
@@ -61,11 +64,14 @@ fn neighbours(cell: &Cell) -> Vec<Cell> {
     ]
 }
 
-fn neighbour_counts(col: &Colony) -> HashMap<Cell, i32> {
-    let mut ncnts = HashMap::new();
-    for neighbor in col.iter().flat_map(neighbours) {
-        *ncnts.entry(neighbor).or_insert(0) += 1;
-    }
+fn neighbour_counts(col: &Colony) -> DashMap<Cell, i32> {
+    let ncnts = DashMap::new();
+
+    col.par_iter().for_each( |alive_cell| {
+        for neighbour in neighbours(&alive_cell) {
+            *ncnts.entry(neighbour).or_insert(0) += 1;
+        }
+    });
     ncnts
 }
 
@@ -169,7 +175,7 @@ impl EventHandler for MainState {
          let time1 = self.start_time.elapsed();
 
         for cell in self.col.iter() {
-            draw_cell(cell, &mut canvas);
+            draw_cell(&cell, &mut canvas);
         }
         if PRINT_DRAW_TIME {
             let time2 = self.start_time.elapsed();
