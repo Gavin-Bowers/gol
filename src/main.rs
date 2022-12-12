@@ -3,6 +3,9 @@ use std::collections::HashSet;
 use std::time::Instant;
 use std::vec;
 
+//use dashmap::HashMap;
+//use dashmap::HashSet;
+
 use rand::Rng;
 
 use ggez::conf;
@@ -13,13 +16,18 @@ use ggez::graphics::{self, Color};
 use ggez::event::EventHandler;
 use ggez::{Context, ContextBuilder, GameResult};
 
-const DESIRED_FPS: u32 = 300;
+const DESIRED_FPS: u32 = 60;
 const TILES_SPANNING: u32 = 100; //The number of tiles spanning the board
 const AUTO_SCALE_TILES: bool = true;
 const TILE_SIZE: u32 = if AUTO_SCALE_TILES {1000 / TILES_SPANNING} else {10} ; //Width of one tile in Pixels
 const SCREEN_SIZE: f32 = (TILES_SPANNING * TILE_SIZE) as f32;
 
+//Performance tools:
+const PRINT_FPS: bool = true;
+const PRINT_DRAW_TIME: bool = false;
+
 type Cell = (i32, i32);
+type Colony = HashSet<Cell>;
 
 fn cell_to_rect(cell: &Cell) -> graphics::Rect {
     graphics::Rect::new_i32(
@@ -39,45 +47,6 @@ fn draw_cell(cell: &Cell, canvas: &mut graphics::Canvas)  {
         );
 }
 
-/*
-#[derive(PartialEq, Eq, Hash)]
-struct Cell {
-    x: i32,
-    y: i32
-}
-
-
-impl Cell {
-    pub fn new(x: &i32, y: &i32) -> Self {
-        Cell{x: *x,y: *y}
-    }
-    /*
-    pub fn consume(x: i32, y: i32) -> Self {
-        Cell{x,y}
-    }
-    */
-    fn draw(&self, canvas: &mut graphics::Canvas) {
-        canvas.draw(
-        &graphics::Quad,
-        graphics::DrawParam::new()
-            .dest_rect(self.into())
-            .color([1.,1.,1.,1.]),
-        );
-    }
-}
-
-impl From<&Cell> for graphics::Rect { //Helper function to turn cell into a rect so it can draw itself
-    fn from(cell_to_draw: &Cell) -> Self {
-        graphics::Rect::new_i32(
-            TILE_SIZE as i32 * cell_to_draw.x,
-            TILE_SIZE as i32 * cell_to_draw.y,
-            TILE_SIZE as i32,
-            TILE_SIZE as i32,
-        )
-    }
-}
-*/
-
 //################################################
 //Supporting functions which assist generation
 //################################################
@@ -92,13 +61,7 @@ fn neighbours(cell: &Cell) -> Vec<Cell> {
     ]
 }
 
-/*
-    Cell::new(&(x-1),&(y-1)), Cell::new(&x,&(y-1)), Cell::new(&(x+1),&(y-1)),
-    Cell::new(&(x-1),&y),                           Cell::new(&(x+1),&y),
-    Cell::new(&(x-1),&(y+1)), Cell::new(&x,&(y+1)), Cell::new(&(x+1),&(y+1)),
-*/
-
-fn neighbour_counts(col: &HashSet<Cell>) -> HashMap<Cell, i32> {
+fn neighbour_counts(col: &Colony) -> HashMap<Cell, i32> {
     let mut ncnts = HashMap::new();
     for neighbor in col.iter().flat_map(neighbours) {
         *ncnts.entry(neighbor).or_insert(0) += 1;
@@ -123,7 +86,7 @@ returns a mutable reference. 1 is added each time we "visit" a cell, so the resu
 it's gonna die so it doesn't matter lol
 */
 
-fn generation(col: &HashSet<Cell>) -> HashSet<Cell> {
+fn generation(col: &Colony) -> Colony {
     neighbour_counts(&col)
         .into_iter()
         .filter_map(|(cell, cnt)|
@@ -135,7 +98,7 @@ fn generation(col: &HashSet<Cell>) -> HashSet<Cell> {
         .collect()
 }
 
-fn random_cells() -> HashSet<Cell> {
+fn random_cells() -> Colony {
     let mut rng = rand::thread_rng();
     let mut cells: Vec<Cell> = Vec::new();
     for row in 0..TILES_SPANNING 
@@ -147,13 +110,13 @@ fn random_cells() -> HashSet<Cell> {
             }
         }
     }
-    let cell_set: HashSet<Cell> = cells.into_iter().collect();
+    let cell_set: Colony = cells.into_iter().collect();
     cell_set
 }
 
 struct MainState { //Used to contain all the information of the game while running
     screen: graphics::ScreenImage,
-    col: HashSet<Cell>,
+    col: Colony,
     frame_count: i32,
     start_time: std::time::Instant,
 }
@@ -188,31 +151,31 @@ impl EventHandler for MainState {
         }
         
         //Show actual framerate
-        if self.frame_count >= 30 {
-            let elapsed_time = self.start_time.elapsed();
-            let fps = self.frame_count as f64 / elapsed_time.as_secs_f64();
-            println!("fps: {:.0}", fps);
-            self.start_time = Instant::now();
-            self.frame_count = 0;
+        if PRINT_FPS {
+            if self.frame_count >= 30 {
+                let elapsed_time = self.start_time.elapsed();
+                let fps = self.frame_count as f64 / elapsed_time.as_secs_f64();
+                println!("fps: {:.0}", fps);
+                self.start_time = Instant::now();
+                self.frame_count = 0;
+            }
         }
-        
-
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_screen_image(ctx, &mut self.screen, Color::BLACK);
 
-        //let time1 = self.start_time.elapsed();
+         let time1 = self.start_time.elapsed();
 
         for cell in self.col.iter() {
             draw_cell(cell, &mut canvas);
         }
-        /*
-        let time2 = self.start_time.elapsed();
-        let draw_time = time2 - time1;
-        println!("It takes {} seconds to draw", draw_time.as_secs_f64());
-        */
+        if PRINT_DRAW_TIME {
+            let time2 = self.start_time.elapsed();
+            let draw_time = time2 - time1;
+            println!("It takes {} seconds to draw", draw_time.as_secs_f64());
+        }
         canvas.finish(ctx)?;
         ctx.gfx.present(&self.screen.image(ctx))?;
         
