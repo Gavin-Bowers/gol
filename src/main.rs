@@ -18,8 +18,8 @@ use ggez::graphics::{self, Color};
 use ggez::event::EventHandler;
 use ggez::{Context, ContextBuilder, GameResult};
 
-const DESIRED_FPS: u32 = 60;
-const TILES_SPANNING: u32 = 1000; //The number of tiles spanning the board
+const DESIRED_FPS: u32 = 30;
+const TILES_SPANNING: u32 = 300; //The number of tiles spanning the board
 const AUTO_SCALE_TILES: bool = true;
 const TILE_SIZE: u32 = if AUTO_SCALE_TILES {1000 / TILES_SPANNING} else {10} ; //Width of one tile in Pixels
 const SCREEN_SIZE: f32 = (TILES_SPANNING * TILE_SIZE) as f32;
@@ -153,7 +153,7 @@ impl EventHandler for MainState {
 
             //used for framerate calculation
             self.frame_count += 1;
-            break; //Very important for running below intended fps and not included in demo...
+            //break; //Very important for running below intended fps and not included in demo...
         }
         
         //Show actual framerate
